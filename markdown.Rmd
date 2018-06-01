@@ -283,8 +283,26 @@ table_of_results[is.na(table_of_results)] <- 0
 table_of_results2 <- select(table_of_results,contains("percent"))
 table_of_results2$country <- table_of_results$country
 
-table_of_results3 <- select(table_of_results2,country,everything()) %>% arrange(desc(win_percent))
-colnames(table_of_results3) <- c("Country","Percent of times team wins group","Percent of times team makes quarter finals",
+
+##add the group the team starts in
+
+team_groups <- c("Russia","Saudi Arabia","Egypt","Uruguay",
+                 "Portugal","Spain","Morocco","Iran",
+                 "France","Australia","Peru","Denmark",
+                 "Argentina","Iceland","Croatia","Nigeria",
+                 "Brazil","Switzerland","Costa Rica","Serbia",
+                 "Germany","Mexico","Sweden","South Korea",
+                 "Belgium","Panama","Tunisia","England",
+                 "Poland","Senegal","Colombia","Japan")
+team_group_names <-c(rep("A",4),rep("B",4),rep("C",4),rep("D",4),rep("E",4),rep("F",4),
+                    rep("G",4),rep("H",4))
+
+team_groups2 <- as.data.frame(cbind(team_groups,team_group_names)) 
+colnames(team_groups2) <- c("country","group")
+table_of_results2a <- inner_join(table_of_results2,team_groups2)
+table_of_results3 <- select(table_of_results2a,country,group,everything()) %>%               arrange(desc(win_percent))
+
+colnames(table_of_results3) <- c("Country","Group","Percent of times team wins group","Percent of times team makes quarter finals",
                                  "Percent of times team makes semis","Percent of times team makes final",
                                  "Percent of times team wins world cup")
 datatable(table_of_results3,rownames=FALSE,options=list(pageLength=32,lengthChange=FALSE,
@@ -300,11 +318,14 @@ The most readily available predictions of world cup results come via betting web
 ```{r results2,echo=FALSE,warning=FALSE,message=FALSE}
 
 table_of_results4 <- select(table_of_results3,contains("percent"))
+table_of_results4[table_of_results4==0] <- 0.0001
 table_of_results4 <- 1/table_of_results4
 table_of_results4 <- round(table_of_results4,2)
 table_of_results4$country <- table_of_results3$Country
-table_of_results4 <- select(table_of_results4,country,everything())
-colnames(table_of_results4) <- c("Country","Decimal odds to win group","Decimal odds to make quarter final",
+table_of_results4$group <- table_of_results3$Group
+
+table_of_results4 <- select(table_of_results4,country,group,everything())
+colnames(table_of_results4) <- c("Country","Group","Decimal odds to win group","Decimal odds to make quarter final",
                                  "Decimal odds to make semis","Decimal odds to make final",
                                  "Decimal odds to win world cup")
 
