@@ -1,0 +1,322 @@
+---
+title: "Monte carlo modelling of the FIFA World Cup"
+author: "Christopher Hay"
+date: "24 May 2018"
+output: html_document
+---
+
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+##PREDICTIVE MODELLING FOR THE 2018 WORLD CUP 
+##read some data from the eloratings.net website
+##rvest seems to be a package that may be of some use in reading the data
+##install.packages("rvest")
+library(rvest)
+library(jsonlite)
+library(tidyverse)
+library(knitr)
+
+
+##read in the file. This was downloaded from a ranking website late May 2018 (see R markdown)
+wc_results3 <- read.csv("C:/Users/pc/Documents/Data science/World cup 2018/wc_results.csv")
+wc_results3 <- wc_results3[,-1]
+wc_results_x <- wc_results3[,c("team_two","team_one","score_two","score_one","rank_team_two",
+                               "conf_team_two","rank_team_one","conf_team_one","year",
+                               "host_region","home_cont_two","home_cont_one","team_two_win",
+                               "team_one_win","draw")]
+
+colnames(wc_results_x) <- colnames(wc_results3)
+wc_results4 <- rbind(wc_results3,wc_results_x)
+wc_results4$rating_diff_amt <- wc_results4$rank_team_one - wc_results4$rank_team_two
+
+wc_results4$rating_diff_percent <- wc_results4$rank_team_one / wc_results4$rank_team_two
+
+
+
+
+##a flag to say whether both teams are either home or away 
+wc_results4$home_stus <- ""
+wc_results4$home_stus[wc_results4$home_cont_one==1&wc_results4$home_cont_two==1] <-"both home"
+
+wc_results4$home_stus[wc_results4$home_cont_one==1&wc_results4$home_cont_two==0] <- "home v away"
+wc_results4$home_stus[wc_results4$home_cont_one==0&wc_results4$home_cont_two==1] <-"away v home"
+wc_results4$home_stus[wc_results4$home_cont_one==0&wc_results4$home_cont_two==0]<- "away v away"
+                            
+wc_results4$result <- ""
+for( i in 1:nrow(wc_results4)){
+    wc_results4$result[i] <-if(wc_results4$score_one[i] >wc_results4$score_two[i]) {("win")}
+    else if (wc_results4$score_one[i] ==wc_results4$score_two[i]){("draw")}
+    else {("loss")}
+    
+}    
+```
+ 
+
+### Introduction
+
+The [2018 FIFA World Cup]("https://en.wikipedia.org/wiki/2018_FIFA_World_Cup") is a football tournament starting on 14 June 2018 in Russia. This document describes the process I have taken to develop a model for determining the outcome of a match at this tournament, based on historic data from previous World Cups. I then use this model to simulate the outcome of the tournament a number of times, in order to give a prediction of the most likely winners of the tournament, as well as other finishes (most likely finalists, semi-finalists etc). 
+
+The results of the modelling were as follows. A more detailed discussion of the results can be found in the Results section.
+
+
+###Results from historic tournaments
+The results of all games from the tournaments held between 1978 - 2014 were downloaded from http://www.international-football.net/ . Ten world cups have been held over this period; this should represent enough games to build a model. I didn't want to delve too far into history out of a concern that the game may have changed such that the results are not informative for our purposes. Note that I haven't tested this assumption!
+
+World Cups consist of a group stage, and then a knockout bracket. During the group stage a game can be a draw; in the knockout stage extra time is played and then a penalty shoot-out takes place if the game is a draw. The source website lists results of knockout games after extra time is played, if needed, and then lists the game as a draw if a penalty shootout took place. The presence of the extra-time results could in theory lead to an under-representation of draws. In my modelling, I haven't treated knockout games differently, this could be a future step in the development of the model.
+
+###Factors to include in the modelling
+So now, I have a list of game results; in order to develop a model, I need some predictors. Intuitively, the main factor will be some measurement of team strength. FIFA maintain [their own rankings]("http://www.fifa.com/fifa-world-ranking/index.html") which may suit our purposes but I have some suspicions over. In particular, these rankings have been used to seed the tournament, so some teams have structured their schedules to maximise this ranking, [such as Poland]("http://www.marca.com/en/football/international-football/2017/11/15/5a0cc44746163f2b218b464e.html"). If you'd wondered why group H looks a bit weak (Poland, Colombia, Senegal,Japan) now you know why!
+
+This fairly candid Wikipedia page makes the claim that [an ELO rating performs better than the FIFA ranking system]("https://en.wikipedia.org/wiki/World_Football_Elo_Ratings"). Therefore, I've used ELO rating of countries as a measure of a team's relative strength. Each team's ELO rating before the world cup has been downloaded from http://www.international-football.net/ , which in turn uses http://www.eloratings.net/ as it's source.
+
+For the modelling, I've also captured each team's continental affiliation, and in which continent the tournament was played in. Note this is based on the team's current affiliation. So for instance Australia moving from OFC to AFC in the early 2000s is not reflected in the historic data; they are treated as being part of AFC for the analysis.
+
+###Relationships of the factors
+
+The below table lists the total win, loss and draw percentages within the data. Now each game is either a draw, or a win for either team; the underlying data lists one row for each game, so I have duplicated the data with the teams and scores swapped, so we have one row for each team and each game. 
+
+<b>Table 1; overall results</b>
+```{r overall,echo=FALSE,message=FALSE,warning=FALSE}
+
+stus1 <- wc_results4  %>% summarise(count_all=n())
+
+stus2 <- wc_results4 %>% filter(team_one_win==1) %>% summarise(count_wins=n())
+stus3 <- wc_results4 %>% filter(draw==1) %>% summarise(count_draws=n())
+
+stus <-  cbind(stus1,stus2) %>%  cbind (stus3) %>% replace_na(list(count_wins=0)) %>%
+    mutate(win_pct = count_wins/count_all,draw_pct = count_draws/count_all,loss_pct = 1-win_pct-draw_pct)
+
+stus$win_pct <- round(stus$win_pct,3)
+stus$draw_pct <- round(stus$draw_pct,3)
+stus$loss_pct <- round(stus$loss_pct,3)
+stus$count_losses <- with(stus,count_all-count_draws-count_wins)
+
+stus <- stus[,c("win_pct","draw_pct","loss_pct","count_wins","count_draws",
+                          "count_losses","count_all")]
+
+colnames(stus) <- c("Win percentage","Draw percentage","Loss percentage","Win count",
+                         "Draw count","Loss count","Total games")
+
+stus <- select(stus,c("Total games","Win count","Draw count","Loss count","Win percentage","Draw percentage","Loss percentage"))
+
+kable(stus)
+
+```
+
+Now I have some factors, it's worth exploring the relationship with the result. Let's start with ELO rating. Of course, a game involves two teams; rather than considering the rank of one team it will be better to consider the ratio of ratings between the teams.
+
+
+
+```{r ggplot2,echo=FALSE}
+g3b <- ggplot(data=wc_results4,aes(x=result,y=rating_diff_percent)) + geom_boxplot()
+g3b <- g3b + xlab("game result")+ ylab("Ratio of team differences") +ggtitle("Figure one: Box plot distribution of ELO rating based on team win")
+g3b
+
+```
+
+Encouragingly, there does appear to be some correlation between the ratio of differences and the result of the game.
+
+Other factors may be worth considering in the modelling as well. Firstly, it may be worth considering the contiental affiliation of the teams. The below table lists win rates by continent;
+
+<b>Table two; results by continental affiliation</b>
+```{r continent,echo=FALSE,message=FALSE,warning=FALSE}
+
+cont_stus1 <- wc_results4 %>% group_by(conf_team_one) %>% summarise(count_all=n())
+
+cont_stus2 <- wc_results4 %>% group_by(conf_team_one) %>%filter(team_one_win==1) %>% summarise(count_wins=n())
+cont_stus3 <- wc_results4 %>% group_by(conf_team_one) %>%filter(draw==1) %>% summarise(count_draws=n())
+
+cont_stus <-  left_join(cont_stus1,cont_stus2) %>%  inner_join (cont_stus3) %>% replace_na(list(count_wins=0)) %>%
+    mutate(win_pct = count_wins/count_all,draw_pct = count_draws/count_all,loss_pct = 1-win_pct-draw_pct)
+
+continent <- as.data.frame(c("Asia","Africa","North America","South America","Oceania","Europe"))
+continent$conf_team_one <- c("AFC","CAF","CONCACAF","CONMEBOL","OFC","UEFA")
+colnames(continent) <- c("Continent","conf_team_one")
+cont_stus <- inner_join(cont_stus,continent)
+cont_stus$count_losses <- with(cont_stus,count_all-count_draws-count_wins)
+cont_stus$win_pct <- round(cont_stus$win_pct,3)
+cont_stus$draw_pct <- round(cont_stus$draw_pct,3)
+cont_stus$loss_pct <- round(cont_stus$loss_pct,3)
+cont_stus <- cont_stus[,c("conf_team_one","Continent","win_pct","draw_pct","loss_pct","count_wins","count_draws",
+                          "count_losses","count_all")]
+
+colnames(cont_stus) <- c("Conference","Continent","Win percentage","Draw percentage","Loss percentage","Win count",
+                         "Draw count","Loss count","Total games")
+
+
+kable(cont_stus)
+
+```
+
+Exploring the relationship between ELO rating and continental affiliation reveals some interesting trends. The below box plots consider the distribution of ELO rating differences by the result of the game, and continental affiliation. All continents seem to show a broadly similar trend, in which teams with a higher ELO rating are more likely to win.
+
+```{r ggplot3,echo=FALSE}
+g3d <- ggplot(data=wc_results4,aes(x=result,y=rating_diff_percent)) + geom_boxplot()
+g3d <- g3d + xlab("game result")+ ylab("Ratio of team differences") +ggtitle("Figure two; Box plot  of ELO rating based on team win, split by continent")
+g3d <- g3d + facet_grid(.~conf_team_one)
+g3d
+
+```
+
+
+Another factor to consider could be the location of the tournament, relative to the location of the teams. E.g. if the tournament is held in Europe then we might see European teams perform better due to the smaller distance of travel. 
+
+```{r ggplot4,echo=FALSE}
+wc_results4$home_stus <- ""
+wc_results4$home_stus[wc_results4$home_cont_one==1&wc_results4$home_cont_two==1] <-"both home"
+
+wc_results4$home_stus[wc_results4$home_cont_one==1&wc_results4$home_cont_two==0] <- "home v away"
+wc_results4$home_stus[wc_results4$home_cont_one==0&wc_results4$home_cont_two==1] <-"away v home"
+wc_results4$home_stus[wc_results4$home_cont_one==0&wc_results4$home_cont_two==0]<- "away v away"
+
+g3d <- ggplot(data=wc_results4,aes(x=result,y=rating_diff_percent)) + geom_boxplot()
+g3d <- g3d + xlab("game result")+ ylab("Ratio of team differences") +ggtitle("Figure three; Box plot of ELO rating based on team win, split by location")
+g3d <- g3d + facet_grid(.~home_stus)
+g3d
+
+```
+
+
+###Modelling approach
+Ultimately we want a model that will take as an input factors relating to the two teams (ELO ratings, continental affilation etc) and produce as an output the probability of team one winning, team two winning, and a draw.
+
+The modelling approach I have taken is to develop a binomal logistic regression model with "team one win" as the outcome variable. Once we have the model we can then apply it to team one and team two to get an estimate of the probabilities of each of the teams winning. The probability of a draw can then be derived via 1 minus the probability of each team winning.
+
+
+
+```{r model,echo=FALSE,warning=FALSE,message=FALSE}
+library(caret)
+library(DT)
+set.seed(101)
+train_data <- createDataPartition(wc_results4$team_one_win,p=0.8,list=FALSE)
+wc_train <-wc_results4[train_data,]
+wc_test <-wc_results4[-train_data,]
+
+wc_glm_conf4b <- glm(data=wc_train,team_one_win~rating_diff_percent+home_cont_two,
+                     family=binomial(link="logit"))
+
+wc_glm_conf4b_predict_test <- ifelse(predict(wc_glm_conf4b,newdata=wc_test)>0,1,0)
+wc_glm_conf4b_predict_tab_test <- table(wc_test$team_one_win,wc_glm_conf4b_predict_test)
+wc_cm <- confusionMatrix(wc_glm_conf4b_predict_tab_test)
+
+wc_cm_accuracy <- round(wc_cm$overall[1],3)
+wc_cm_accuracy_lower <- round(wc_cm$overall[3],3)
+wc_cm_accuracy_upper <- round(wc_cm$overall[4],3)
+
+wc_cm_accuracy2 <- wc_cm_accuracy*100
+```
+
+The final model that I settled on uses the rating, and a factor based on whether the opposing team was playing in their home continent. Applying this model to a hold-out sample resulted in a `r wc_cm_accuracy` accuracy in predicting a win, with 95% confidence that the true model accuracy lies between `r wc_cm_accuracy_lower` and `r wc_cm_accuracy_upper`. In other words, the model is able to predict an accurate result `r wc_cm_accuracy2`% of the time. 
+
+This is an acceptable result for our modelling, without being incredibly accurate; since circa 40% of games end in a win for a specific team, a coin-flip model with heads for a win and tails for a loss would be accurate 40% of the time. Nevertheless, this model should be sufficient for the purposes of our simulations.
+
+###Monte-carlo simulation
+Monte-carlo simulation involves iterating a process with random factors in order to obtain a distribution of possible results (for more information, please see [this wikipedia link]("https://en.wikipedia.org/wiki/Monte_Carlo_method") ). Now that we have a model that can predict the result of a game, we can use this to simulate the entire world cup.
+
+The method that I have used to do this is as follows. Teams have already been seperated into pools based on [the world cup draw](https://en.wikipedia.org/wiki/2018_FIFA_World_Cup). For the group stage, I apply the model for each team, for each game. I then apply a random number between 0 and 1 to each game; if this number is less than the estimate for team one, the game is a win for that team; if it is larger than the win estimate but less than the draw estimate, then the game is a draw; otherwise the game is a win for team two.
+
+The below table is an example  of this.
+
+<b>Table three; example of group stage modelling</b>
+```{r group,echo=FALSE}
+
+games <- read.csv("C:/Users/pc/Documents/Data science/World cup 2018/group game preds.csv")
+
+games2 <- games[c(1:4),]
+games3 <- select(games2,c("team_one","rank_team_one","team_two","rank_team_two","team_one_win_pred",
+                         "draw_pred","team_two_win_pred","rngs"))
+
+games3$result <- ""
+games3$result[games2$win_one==1] <- paste0(games2$team_one[games2$win_one==1]," win")
+
+games3$result[games2$win_two==1] <- paste0(games2$team_two[games2$win_two==1]," win")
+
+games3$result[games2$draw==1] <- paste0("Draw")
+ games3$team_one_win_pred <- round(games3$team_one_win_pred,3 )
+ games3$draw_pred <- round(games3$draw_pred,3 )
+ games3$team_two_win_pred <- round(games3$team_two_win_pred,3 )
+ games3$rngs <- round(games3$rngs,3 )
+ colnames(games3) <- c("Team one","Rank team one","Team two","Rank team two","Team one win likelihood",
+                       "Draw likelihood","Team two win likelihood","Random number","Result based on random number")
+
+kable(games3)
+```
+
+Using a random number generator I can then determine a result for each game. Once we have done this I can calculate the results of the group stage. In the event of a tie during the group stage, I have used a second random number to determine the ranking. 
+
+Once this has taken place, I can then simulate the knock-out stages. For the knock-out stages I have used the same method as above to determine the likelihood of each winner. In the event of a draw, I have used a coin-flip to determine the result. This could weight slightly towards the less favoured team, but acts as a simplifying assumption in part. 
+
+We can then iterate this process a number of times; the results of this are then an approximation of how we might expect the result to play out.
+
+###Results
+
+The below table lists how far each team progressed in the world cup, based on 1,000 iterations of the simulation described above.
+
+<b>Table four; modelling results</b>
+```{r results,echo=FALSE,warning=FALSE,message=FALSE}
+
+library(dplyr)
+
+ group_win_count <- read.csv("C:/Users/pc/Documents/Data science/World cup 2018/group win count preds.csv")
+ group_win_count <- group_win_count[,-1]
+ wc_qfs <- read.csv("C:/Users/pc/Documents/Data science/World cup 2018/quarter finalist preds.csv")
+ wc_qfs <- wc_qfs[,-1]
+ wc_semis <- read.csv("C:/Users/pc/Documents/Data science/World cup 2018/semi finalist preds.csv")
+ wc_semis <- wc_semis[,-1]
+ wc_finalists <- read.csv("C:/Users/pc/Documents/Data science/World cup 2018/finalist preds.csv")
+ wc_finalists <- wc_finalists[,-1]
+ wc_winners <- read.csv("C:/Users/pc/Documents/Data science/World cup 2018/winner preds.csv")
+ wc_winners <- wc_winners[,-1]
+ 
+ colnames(group_win_count) <- c("country","group_wins","group_win_percent","group_win_return")
+ 
+colnames(wc_qfs) <- c("country","qfs","qf_percent")
+wc_qfs$qf_return <- 1/wc_qfs$qf_percent
+colnames(wc_semis) <- c("country","semis","semi_percent","semi_return")
+colnames(wc_finalists) <- c("country","finals","final_percent","final_return")
+
+colnames(wc_winners) <- c("country","wins","win_percent","win_return")
+
+table_of_results <- group_win_count %>% left_join(wc_qfs,by="country") %>% left_join(wc_semis,by="country") %>%
+                    left_join(wc_finalists,by="country") %>% left_join(wc_winners,by="country")
+
+table_of_results[is.na(table_of_results)] <- 0
+table_of_results2 <- select(table_of_results,contains("percent"))
+table_of_results2$country <- table_of_results$country
+
+table_of_results3 <- select(table_of_results2,country,everything()) %>% arrange(desc(win_percent))
+colnames(table_of_results3) <- c("Country","Percent of times team wins group","Percent of times team makes quarter finals",
+                                 "Percent of times team makes semis","Percent of times team makes final",
+                                 "Percent of times team wins world cup")
+datatable(table_of_results3,rownames=FALSE,options=list(pageLength=32,lengthChange=FALSE,
+                                                        searching=FALSE,fixedHeader.footer=FALSE))
+
+```
+
+Some interesting narratives present themselves when reviewing this table, and in particular how some teams have markedly different likelihoods of winning their group against winning the world cup. For instance, Poland have a higher likelihood than Portugal than winning their group, but Portgual still have a much higher likelihood of winning the world cup. Recall Poland are in a comparatively weak group but Portugal's group contains Spain.
+
+The most readily available predictions of world cup results come via betting websites. For easy comparison, the below table contains the same information but presented as "decimal odds". This can be interpreted as the winnings made when a bet is placed on that team. 
+
+<b>Table five; modelling results formatted as decimal odds</b>
+```{r results2,echo=FALSE,warning=FALSE,message=FALSE}
+
+table_of_results4 <- select(table_of_results3,contains("percent"))
+table_of_results4 <- 1/table_of_results4
+table_of_results4 <- round(table_of_results4,2)
+table_of_results4$country <- table_of_results3$Country
+table_of_results4 <- select(table_of_results4,country,everything())
+colnames(table_of_results4) <- c("Country","Decimal odds to win group","Decimal odds to make quarter final",
+                                 "Decimal odds to make semis","Decimal odds to make final",
+                                 "Decimal odds to win world cup")
+
+datatable(table_of_results4,rownames=FALSE,options=list(pageLength=32,lengthChange=FALSE,
+                                                        searching=FALSE,fixedHeader.footer=FALSE))
+
+```
+
+
+###Links & Further information
+For all of this analysis, I have used RStudio. Here is a link to a Github repository with my R scripts. Please be forewarned that the exploratory analysis and modelling stages are quite messy. 
+
+https://github.com/chrishay1/wc2018_pred
+
+I can be contacted at an_aucklander@hotmail.com if needed.
