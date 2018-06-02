@@ -4,7 +4,7 @@ author: "Christopher Hay"
 date: "24 May 2018"
 output: html_document
 ---
-
+<base target="_blank"/>
 ```{r echo=FALSE,warning=FALSE,message=FALSE}
 ##PREDICTIVE MODELLING FOR THE 2018 WORLD CUP 
 ##read some data from the eloratings.net website
@@ -53,7 +53,7 @@ for( i in 1:nrow(wc_results4)){
 
 ### Introduction
 
-The [2018 FIFA World Cup]("https://en.wikipedia.org/wiki/2018_FIFA_World_Cup") is a football tournament starting on 14 June 2018 in Russia. This document describes the process I have taken to develop a model for determining the outcome of a match at this tournament, based on historic data from previous World Cups. I then use this model to simulate the outcome of the tournament a number of times, in order to give a prediction of the most likely winners of the tournament, as well as other finishes (most likely finalists, semi-finalists etc). 
+The <a href="http://en.wikipedia.org/wiki/2018_FIFA_World_Cup"> 2018 FIFA World Cup</a> is a football tournament starting on 14 June 2018 in Russia. This document describes the process I have taken to develop a model for determining the outcome of a match at this tournament, based on historic data from previous World Cups. I then use this model to simulate the outcome of the tournament a number of times, in order to give a prediction of the most likely winners of the tournament, as well as other finishes (most likely finalists, semi-finalists etc). 
 
 The results of the modelling were as follows. A more detailed discussion of the results can be found in the Results section.
 
@@ -64,9 +64,9 @@ The results of all games from the tournaments held between 1978 - 2014 were down
 World Cups consist of a group stage, and then a knockout bracket. During the group stage a game can be a draw; in the knockout stage extra time is played and then a penalty shoot-out takes place if the game is a draw. The source website lists results of knockout games after extra time is played, if needed, and then lists the game as a draw if a penalty shootout took place. The presence of the extra-time results could in theory lead to an under-representation of draws. In my modelling, I haven't treated knockout games differently, this could be a future step in the development of the model.
 
 ###Factors to include in the modelling
-So now, I have a list of game results; in order to develop a model, I need some predictors. Intuitively, the main factor will be some measurement of team strength. FIFA maintain [their own rankings]("http://www.fifa.com/fifa-world-ranking/index.html") which may suit our purposes but I have some suspicions over. In particular, these rankings have been used to seed the tournament, so some teams have structured their schedules to maximise this ranking, [such as Poland]("http://www.marca.com/en/football/international-football/2017/11/15/5a0cc44746163f2b218b464e.html"). If you'd wondered why group H looks a bit weak (Poland, Colombia, Senegal,Japan) now you know why!
+So now, I have a list of game results; in order to develop a model, I need some predictors. Intuitively, the main factor will be some measurement of team strength. FIFA maintain <a href="http://www.fifa.com/fifa-world-ranking/index.html"> their own rankings </a> which may suit our purposes but I have some suspicions over. In particular, these rankings have been used to seed the tournament, so some teams have structured their schedules to maximise this ranking, <a href="http://www.marca.com/en/football/international-football/2017/11/15/5a0cc44746163f2b218b464e.html">such as Poland</a>. If you'd wondered why group H looks a bit weak (Poland, Colombia, Senegal,Japan) now you know why!
 
-This fairly candid Wikipedia page makes the claim that [an ELO rating performs better than the FIFA ranking system]("https://en.wikipedia.org/wiki/World_Football_Elo_Ratings"). Therefore, I've used ELO rating of countries as a measure of a team's relative strength. Each team's ELO rating before the world cup has been downloaded from http://www.international-football.net/ , which in turn uses http://www.eloratings.net/ as it's source.
+This fairly candid Wikipedia page makes the claim that <a href="http://en.wikipedia.org/wiki/World_Football_Elo_Ratings"> an ELO rating performs better than the FIFA ranking system</a>. Therefore, I've used ELO rating of countries as a measure of a team's relative strength. Each team's ELO rating before the world cup has been downloaded from http://www.international-football.net/ , which in turn uses http://www.eloratings.net/ as it's source.
 
 For the modelling, I've also captured each team's continental affiliation, and in which continent the tournament was played in. Note this is based on the team's current affiliation. So for instance Australia moving from OFC to AFC in the early 2000s is not reflected in the historic data; they are treated as being part of AFC for the analysis.
 
@@ -210,11 +210,11 @@ The final model that I settled on uses the rating, and a factor based on whether
 This is an acceptable result for our modelling, without being incredibly accurate; since circa 40% of games end in a win for a specific team, a coin-flip model with heads for a win and tails for a loss would be accurate 40% of the time. Nevertheless, this model should be sufficient for the purposes of our simulations.
 
 ###Monte-carlo simulation
-Monte-carlo simulation involves iterating a process with random factors in order to obtain a distribution of possible results (for more information, please see [this wikipedia link]("https://en.wikipedia.org/wiki/Monte_Carlo_method") ). Now that we have a model that can predict the result of a game, we can use this to simulate the entire world cup.
+Monte-carlo simulation involves iterating a process with random factors in order to obtain a distribution of possible results (for more information, please see <a href="http://en.wikipedia.org/wiki/Monte_Carlo_method">this wikipedia link</a>. Now that we have a model that can predict the result of a game, we can use this to simulate the entire world cup.
 
-The method that I have used to do this is as follows. Teams have already been seperated into pools based on [the world cup draw](https://en.wikipedia.org/wiki/2018_FIFA_World_Cup). For the group stage, I apply the model for each team, for each game. I then apply a random number between 0 and 1 to each game; if this number is less than the estimate for team one, the game is a win for that team; if it is larger than the win estimate but less than the draw estimate, then the game is a draw; otherwise the game is a win for team two.
+The method that I have used to do this is as follows. Teams have already been seperated into pools based on <a href="http://en.wikipedia.org/wiki/2018_FIFA_World_Cup">the world cup draw</a>. For the group stage, I apply the model for each team, for each game. I then apply a random number between 0 and 1 to each game; if this number is less than the estimate for team one, the game is a win for that team; if it is larger than the win estimate but less than the draw estimate, then the game is a draw; otherwise the game is a win for team two.
 
-The below table is an example  of this.
+The below table is an example of this.
 
 <b>Table three; example of group stage modelling</b>
 ```{r group,echo=FALSE}
@@ -338,6 +338,6 @@ datatable(table_of_results4,rownames=FALSE,options=list(pageLength=32,lengthChan
 ###Links & Further information
 For all of this analysis, I have used RStudio. Here is a link to a Github repository with my R scripts. Please be forewarned that the exploratory analysis and modelling stages are quite messy. 
 
-https://github.com/chrishay1/wc2018_pred
+http://github.com/chrishay1/wc2018_pred
 
-I can be contacted at an_aucklander@hotmail.com if needed.
+I can be contacted at chrishay1@gmail.com if needed.
