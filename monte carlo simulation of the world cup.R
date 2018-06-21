@@ -381,8 +381,8 @@ t2_data <-  r4_game_table[2,c("advance_team","advance_rank_team","advance_conf",
 r2_game_table <- cbind(t1_data,t2_data)
 colnames(r2_game_table) <- c("team_one","rank_team_one","conf_team_one","home_cont_one",
                             "team_two","rank_team_two","conf_team_two","home_cont_two")
-r2_game_table$rating_diff_percent_one <- r4_game_temp$rank_team_one / r4_game_temp$rank_team_two
-r2_game_table$rating_diff_percent_two <- r4_game_temp$rank_team_two / r4_game_temp$rank_team_one
+r2_game_table$rating_diff_percent_one <- r2_game_table$rank_team_one / r2_game_table$rank_team_two
+r2_game_table$rating_diff_percent_two <- r2_game_table$rank_team_two / r2_game_table$rank_team_one
         
 team_one_pred_temp <- select(r2_game_table,conf_team_one,home_cont_one,home_cont_two,rating_diff_percent_one)
 colnames(team_one_pred_temp) <- c("conf_team_one","home_cont_one","home_cont_two","rating_diff_percent")
@@ -487,3 +487,11 @@ write.csv(wc_qfs,"C:/Users/pc/Documents/Data science/World cup 2018/quarter fina
 write.csv(wc_semis,"C:/Users/pc/Documents/Data science/World cup 2018/semi finalist preds.csv")
 write.csv(wc_finalists,"C:/Users/pc/Documents/Data science/World cup 2018/finalist preds.csv")
 write.csv(wc_winners,"C:/Users/pc/Documents/Data science/World cup 2018/winner preds.csv")
+library(dplyr)
+wc_finalists_spec <- wc_quarterfinals_out %>%filter(rank %in% c(1))
+
+wc_finalists_spec2 <- wc_quarterfinals_out %>%filter(rank %in% c(2))
+wc_finalists_det <- paste0(wc_finalists_spec[,1]," ",wc_finalists_spec2[,1]) 
+wc_finalists_table <- table(wc_finalists_det)/1000 
+
+write.csv(wc_finalists_table,"C:/Users/pc/Documents/Data science/World cup 2018/specific finalists.csv")
